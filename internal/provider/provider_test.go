@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/stretchr/testify/require"
 )
 
 var providerConfig = fmt.Sprintf(`
@@ -26,8 +27,9 @@ var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServe
 	"resend": providerserver.NewProtocol6WithError(New("test")()),
 }
 
-func testAccPreCheck(t *testing.T) {
+func TestAccPreCheck(t *testing.T) {
 	// You can add code here to run prior to any test case execution, for example assertions
 	// about the appropriate environment variables being set are common to see in a pre-check
 	// function.
+	require.NotEmpty(t, os.Getenv("RESEND_API_KEY"))
 }

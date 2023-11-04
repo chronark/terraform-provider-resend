@@ -29,7 +29,7 @@ type DomainResource struct {
 	client *resend.Client
 }
 
-type record struct {
+type Record struct {
 	Record   types.String `tfsdk:"record"`
 	Name     types.String `tfsdk:"name"`
 	Type     types.String `tfsdk:"type"`
@@ -235,7 +235,6 @@ func (r *DomainResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update domain, got error: %s", "not implemented"))
 
-	return
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
