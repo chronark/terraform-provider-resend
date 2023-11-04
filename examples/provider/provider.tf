@@ -1,3 +1,3 @@
-provider "scaffolding" {
+provider "resend" {
   # example configuration here
 }

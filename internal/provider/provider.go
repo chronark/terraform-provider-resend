@@ -5,80 +5,111 @@ package provider
 
 import (
 	"context"
-	"net/http"
+	"fmt"
+	"log"
+	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/resendlabs/resend-go"
 )
 
-// Ensure ScaffoldingProvider satisfies various provider interfaces.
-var _ provider.Provider = &ScaffoldingProvider{}
+// Ensure ResendProvider satisfies various provider interfaces.
+var _ provider.Provider = &ResendProvider{}
 
-// ScaffoldingProvider defines the provider implementation.
-type ScaffoldingProvider struct {
+// ResendProvider defines the provider implementation.
+type ResendProvider struct {
 	// version is set to the provider version on release, "dev" when the
 	// provider is built and ran locally, and "test" when running acceptance
 	// testing.
 	version string
 }
 
-// ScaffoldingProviderModel describes the provider data model.
-type ScaffoldingProviderModel struct {
-	Endpoint types.String `tfsdk:"endpoint"`
+// ResendProviderModel describes the provider data model.
+type ResendProviderModel struct {
+	ApiKey types.String `tfsdk:"api_key"`
 }
 
-func (p *ScaffoldingProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "scaffolding"
+func (p *ResendProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
+	resp.TypeName = "resend"
 	resp.Version = p.version
 }
 
-func (p *ScaffoldingProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
+func (p *ResendProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"endpoint": schema.StringAttribute{
-				MarkdownDescription: "Example provider attribute",
-				Optional:            true,
+			"api_key": schema.StringAttribute{
+				MarkdownDescription: "A resend API key",
+				Required:            true,
+				Sensitive:           true,
 			},
 		},
 	}
 }
 
-func (p *ScaffoldingProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	var data ScaffoldingProviderModel
-
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+func (p *ResendProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+	var config ResendProviderModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Configuration values are now available.
-	// if data.Endpoint.IsNull() { /* ... */ }
+	if config.ApiKey.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("api_key"),
+			"Unknown API key",
+			"The provider cannot create the Resend API client if the key is unknown. "+
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the RESEND_API_KEY environment variable.",
+		)
+	}
 
-	// Example client configuration for data sources and resources
-	client := http.DefaultClient
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	log.Println(os.Environ())
+
+	apiKey := os.Getenv("RESEND_API_KEY")
+	if !config.ApiKey.IsNull() {
+		apiKey = config.ApiKey.ValueString()
+	}
+
+	if apiKey == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("api_key"),
+			"Missing api key",
+			"The provider cannot create the Resend API client as there is a missing or empty value for the Resend api key. "+
+				"Set the api_key value in the configuration or use the RESEND_API_KEY environment variable. "+
+				"If either is already set, ensure the value is not empty.",
+		)
+
+		return
+	}
+	tflog.Info(ctx, fmt.Sprintf("Creating Resend API client %s", apiKey))
+	client := resend.NewClient(config.ApiKey.ValueString())
 	resp.DataSourceData = client
 	resp.ResourceData = client
 }
 
-func (p *ScaffoldingProvider) Resources(ctx context.Context) []func() resource.Resource {
+func (p *ResendProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewExampleResource,
+		NewDomainResource,
+		NewApiKeyResource,
 	}
 }
 
-func (p *ScaffoldingProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{
-		NewExampleDataSource,
-	}
+func (p *ResendProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
+	return []func() datasource.DataSource{}
 }
 
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
-		return &ScaffoldingProvider{
+		return &ResendProvider{
 			version: version,
 		}
 	}
